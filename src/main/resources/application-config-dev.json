@@ -1,0 +1,15 @@
+{
+  "HTTP_PORT" : 8888,
+  "reactive-connect-db": {
+    "port": 5432,
+    "host": "localhost",
+    "database": "edu3",
+    "user": "postgres",
+    "password": "4"
+  },
+  "jdbc-connect-db": {
+    "type": "git",
+    "url": "https://github.com/VladMilash/edu-vert-x-app.git"
+  },
+  "private": true
+}
