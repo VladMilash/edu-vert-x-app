@@ -7,8 +7,13 @@ import io.vertx.sqlclient.Pool;
 import io.vertx.sqlclient.PoolOptions;
 
 public class DbConfig {
+  private final Vertx vertx;
 
-  public Pool getPool(Vertx vertx, JsonObject properties) {
+  public DbConfig(Vertx vertx) {
+    this.vertx = vertx;
+  }
+
+  public Pool getPool(JsonObject properties) {
       PgConnectOptions connectOptions = new PgConnectOptions()
       .setPort(properties.getInteger("port"))
       .setHost(properties.getString("host"))

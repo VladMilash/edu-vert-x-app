@@ -1,6 +1,7 @@
 package com.mvo.edu_vert_x_app;
 
 import com.mvo.edu_vert_x_app.config.DbConfig;
+import com.mvo.edu_vert_x_app.config.FlywayConfig;
 import com.mvo.edu_vert_x_app.controller.StudentController;
 import com.mvo.edu_vert_x_app.repository.StudentRepository;
 import io.vertx.core.Future;
@@ -16,13 +17,15 @@ public class MainVerticle extends VerticleBase {
   private StudentRepository studentRepository;
   private StudentController studentController;
   private DbConfig dbConfig;
+  private FlywayConfig flywayConfig;
+
 
   @Override
   public Future<?> start() {
-    dbConfig = new DbConfig();
+    dbConfig = new DbConfig(vertx);
     Pool client = getPool();
 
-
+    flywayConfig = new FlywayConfig(vertx);
     configureFlyway();
 
     studentRepository = new StudentRepository();
@@ -38,7 +41,12 @@ public class MainVerticle extends VerticleBase {
 
   private Pool getPool() {
     JsonObject properties = config().getJsonObject("reactive-connect-db");
-    return dbConfig.getPool(vertx,properties);
+    return dbConfig.getPool(properties);
+  }
+
+  private void configureFlyway() {
+    JsonObject properties = config().getJsonObject("flyway");
+    flywayConfig.configureFlyway(properties);
   }
 
   private Future<HttpServer> getHttpServerFuture(Router router) {
@@ -56,15 +64,5 @@ public class MainVerticle extends VerticleBase {
     return router;
   }
 
-
-  private static void configureFlyway() {
-
-    Flyway flyway = Flyway.configure()
-      .dataSource("jdbc:postgresql://localhost:5432/edu3", "postgres", "4")
-      .locations("classpath:db/migration")
-      .load();
-
-    flyway.migrate();
-  }
 
 }
