@@ -1,11 +1,16 @@
 {
   "HTTP_PORT" : 8888,
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "reactive-connect-db": {
+    "port": 5432,
+    "host": "localhost",
+    "database": "edu3",
+    "user": "postgres",
+    "password": "4"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/VladMilash/edu-vert-x-app.git"
-  },
-  "private": true
+  "flyway": {
+    "url": "jdbc:postgresql://localhost:5432/edu3",
+    "user": "postgres",
+    "password": "4",
+    "locations": "classpath:db/migration"
+  }
 }
