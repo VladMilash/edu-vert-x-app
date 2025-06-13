@@ -4,7 +4,10 @@ import com.mvo.edu_vert_x_app.config.DbConfig;
 import com.mvo.edu_vert_x_app.config.FlywayConfig;
 import com.mvo.edu_vert_x_app.controller.StudentController;
 import com.mvo.edu_vert_x_app.mapper.StudentMapper;
+import com.mvo.edu_vert_x_app.repository.CourseRepository;
+import com.mvo.edu_vert_x_app.repository.StudentCourseRepository;
 import com.mvo.edu_vert_x_app.repository.StudentRepository;
+import com.mvo.edu_vert_x_app.repository.TeacherRepository;
 import com.mvo.edu_vert_x_app.service.StudentService;
 import com.mvo.edu_vert_x_app.service.impl.StudentServiceImpl;
 import io.vertx.core.Future;
@@ -30,7 +33,11 @@ public class MainVerticle extends VerticleBase {
 
     StudentMapper studentMapper = new StudentMapper();
     StudentRepository studentRepository = new StudentRepository(studentMapper);
-    StudentService studentService = new StudentServiceImpl(studentRepository,studentMapper);
+    StudentCourseRepository studentCourseRepository = new StudentCourseRepository();
+    CourseRepository courseRepository = new CourseRepository();
+    TeacherRepository teacherRepository = new TeacherRepository();
+    StudentService studentService = new StudentServiceImpl(studentRepository, studentMapper,
+      studentCourseRepository, courseRepository, teacherRepository);
     studentController = new StudentController(client, studentService);
 
     Router router = getRouter();

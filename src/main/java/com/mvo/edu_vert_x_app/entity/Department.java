@@ -3,10 +3,10 @@ package com.mvo.edu_vert_x_app.entity;
 import lombok.Data;
 
 @Data
-public class Course {
+public class Department {
   private Long id;
 
-  private String title;
+  private String name;
 
-  private Long teacherId;
+  private Long headOfDepartment;
 }

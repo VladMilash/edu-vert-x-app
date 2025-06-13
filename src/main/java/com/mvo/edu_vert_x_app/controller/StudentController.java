@@ -3,12 +3,8 @@ package com.mvo.edu_vert_x_app.controller;
 import com.mvo.edu_vert_x_app.dto.request.StudentTransientDTO;
 import com.mvo.edu_vert_x_app.service.StudentService;
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.ParsedHeaderValue;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.sqlclient.Pool;
-
-import java.util.List;
-import java.util.Map;
 
 public class StudentController {
   private final Pool client;
