@@ -1,14 +1,20 @@
 package com.mvo.edu_vert_x_app.repository;
 
 import com.mvo.edu_vert_x_app.entity.Course;
+import com.mvo.edu_vert_x_app.mapper.CourseMapper;
 import io.vertx.core.Future;
 import io.vertx.sqlclient.Pool;
-import io.vertx.sqlclient.Row;
 import io.vertx.sqlclient.Tuple;
 
 import java.util.*;
 
 public class CourseRepository {
+  private final CourseMapper courseMapper;
+
+  public CourseRepository(CourseMapper courseMapper) {
+    this.courseMapper = courseMapper;
+  }
+
   public Future<List<Course>> getByIdIn(List<Long> courseIds, Pool client) {
     if (courseIds.isEmpty()) {
       return Future.succeededFuture(Collections.emptyList());
@@ -20,17 +26,7 @@ public class CourseRepository {
     return client
       .withConnection(conn ->
         conn.preparedQuery(sql).execute(params)
-          .map(rows -> {
-            List<Course> courseList = new ArrayList<>();
-            for (Row row : rows) {
-              Course course = new Course();
-              course.setId(row.getLong("id"));
-              course.setTitle(row.getString("title"));
-              course.setTeacherId(row.getLong("teacher_id"));
-              courseList.add(course);
-            }
-            return courseList;
-          })
+          .map(courseMapper::fromRowsToCoursesList)
       );
   }
 }

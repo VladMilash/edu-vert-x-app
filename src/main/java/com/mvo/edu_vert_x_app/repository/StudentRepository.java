@@ -3,6 +3,7 @@ package com.mvo.edu_vert_x_app.repository;
 import com.mvo.edu_vert_x_app.dto.request.StudentTransientDTO;
 import com.mvo.edu_vert_x_app.entity.Student;
 
+import com.mvo.edu_vert_x_app.exception.NotFoundEntityException;
 import com.mvo.edu_vert_x_app.mapper.StudentMapper;
 import io.vertx.sqlclient.Pool;
 import io.vertx.sqlclient.Tuple;
@@ -33,7 +34,13 @@ public class StudentRepository {
         """)
       .execute(Tuple.of(id))
       .onComplete(ar -> conn.close())
-      .map(studentMapper::fromRowToStudent));
+      .map(rows -> {
+        if (rows.size() == 0) {
+          throw new NotFoundEntityException(String.format("Student with id: %d not found", id));
+        }
+        return studentMapper.fromRowToStudent(rows);
+      })
+    );
   }
 }
 

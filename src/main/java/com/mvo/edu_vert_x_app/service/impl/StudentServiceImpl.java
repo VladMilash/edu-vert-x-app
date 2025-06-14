@@ -17,12 +17,15 @@ import com.mvo.edu_vert_x_app.service.StudentService;
 import io.vertx.sqlclient.Pool;
 
 import io.vertx.core.Future;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class StudentServiceImpl implements StudentService {
+  private static final Logger logger = LoggerFactory.getLogger(StudentServiceImpl.class);
   private final StudentRepository studentRepository;
   private final StudentMapper studentMapper;
   private final StudentCourseRepository studentCourseRepository;
@@ -41,8 +44,11 @@ public class StudentServiceImpl implements StudentService {
 
   @Override
   public Future<ResponseStudentDTO> save(StudentTransientDTO studentTransientDTO, Pool client) {
+    logger.info("Saving student with email: {}", studentTransientDTO.email());
     return studentRepository.save(studentTransientDTO, client)
-      .map(studentMapper::fromStudentToResponseStudentDTO);
+      .map(studentMapper::fromStudentToResponseStudentDTO)
+      .onSuccess(studentDTO -> logger.info("Student successfully created with id: {}", studentDTO.id()))
+      .onFailure(error -> logger.error("Failed to saving student", error));
   }
 
   @Override
@@ -54,80 +60,79 @@ public class StudentServiceImpl implements StudentService {
       .flatMap(composite -> {
         Student student = composite.resultAt(0);
         List<StudentCourse> studentCourseList = composite.resultAt(1);
-
-        if (studentCourseList.isEmpty()) {
-          return Future.succeededFuture(studentMapper.fromStudentToResponseStudentDTO(student));
-        }
-
-        List<Long> coursesIds = studentCourseList
-          .stream()
-          .map(StudentCourse::getCourseId)
-          .toList();
-        return loadCoursesAndTeachersForStudent(student, coursesIds, client);
+        return loadStudentData(student, studentCourseList, client);
       });
   }
 
-  private Future<ResponseStudentDTO> loadCoursesAndTeachersForStudent(Student student, List<Long> coursesIds, Pool client) {
-    Future<List<Course>> courseListFuture = courseRepository.getByIdIn(coursesIds, client);
+  private Future<ResponseStudentDTO> loadStudentData(Student student,
+                                                     List<StudentCourse> studentCourseList,
+                                                     Pool client) {
+    if (studentCourseList.isEmpty()) {
+      return Future.succeededFuture(studentMapper.fromStudentToResponseStudentDTO(student));
+    }
 
-    return Future.all(Collections.singletonList(courseListFuture))
-      .flatMap(composite -> {
-        List<Course> courseList = composite.resultAt(0);
-        List<Long> teacherIds = courseList
-          .stream()
-          .map(Course::getTeacherId)
-          .filter(Objects::nonNull)
-          .toList();
+    List<Long> coursesIds = getEntityIdsAsList(studentCourseList,StudentCourse::getCourseId);
 
-        if (teacherIds.isEmpty()) {
-          Set<CourseDTO> courseDTOS = courseList
-            .stream()
-            .map(course -> {
-              return new CourseDTO(course.getId(), course.getTitle(), null);
-            })
-            .collect(Collectors.toSet());
-          return Future.succeededFuture(new ResponseStudentDTO(student.getId(), student.getName(), student.getEmail(), courseDTOS));
-        }
-        return loadTeacherForCourses(student, courseList, teacherIds, client);
+    return courseRepository.getByIdIn(coursesIds, client)
+      .compose(courses -> {
+        List<Long> teachersIds = getEntityIdsAsList(courses,Course::getTeacherId);
+        return teacherRepository.getByIdIn(teachersIds, client)
+          .compose(teachers -> {
+            Set<CourseDTO> courseDTOS = getCourseDTOSet(teachers, courses);
+            return Future.succeededFuture(getResponseStudentDTO(student, courseDTOS));
+          });
       });
   }
 
-  private Future<ResponseStudentDTO> loadTeacherForCourses(Student student, List<Course> courseList, List<Long> teacherIds, Pool client) {
-    Future<List<Teacher>> teachersListFuture = teacherRepository.getByIdIn(teacherIds, client);
+  private static <T> List<Long> getEntityIdsAsList(List<T> list, Function<T,Long> function) {
+    return list
+      .stream()
+      .map(function)
+      .toList();
+  }
 
-    return Future.all(Collections.singletonList(teachersListFuture))
-      .flatMap(composite -> {
-        List<Teacher> teacherList = composite.resultAt(0);
-        Map<Long, Teacher> teacherMap = teacherList
-          .stream()
-          .collect(Collectors.toMap(Teacher::getId, Function.identity()));
+  private static Set<CourseDTO> getCourseDTOSet(List<Teacher> teachers, List<Course> courses) {
+    Map<Long, Teacher> teacherMap = teachers
+      .stream()
+      .collect(Collectors.toMap(Teacher::getId, Function.identity()));
 
-        Set<CourseDTO> courseDTOS = courseList
-          .stream()
-          .map(course -> {
-            if (course.getTeacherId() != null && teacherMap.containsKey(course.getTeacherId())) {
-              Long teacherId = course.getTeacherId();
-              Teacher teacher = teacherMap.get(teacherId);
-              TeacherDTO teacherDTO = new TeacherDTO(
-                teacher.getId(),
-                teacher.getName()
-              );
-              return new CourseDTO(
-                course.getId(),
-                course.getTitle(),
-                teacherDTO
-              );
-            }
+    return courses
+      .stream()
+      .map(course -> {
+        if (!teacherMap.isEmpty() && course.getTeacherId() != null && teacherMap.containsKey(course.getTeacherId())) {
+          return getCourseDTO(course, teacherMap);
+        }
+        return getCourseDTO(course);
+      })
+      .collect(Collectors.toSet());
+  }
 
-            return new CourseDTO(
-              course.getId(),
-              course.getTitle(),
-              null
-            );
-          })
-          .collect(Collectors.toSet());
-        return Future.succeededFuture(new ResponseStudentDTO(student.getId(), student.getName(), student.getEmail(), courseDTOS));
+  private static CourseDTO getCourseDTO(Course course) {
+    return new CourseDTO(
+      course.getId(),
+      course.getTitle(),
+      null
+    );
+  }
 
-      });
+  private static CourseDTO getCourseDTO(Course course, Map<Long, Teacher> teacherMap) {
+    Long teacherId = course.getTeacherId();
+    Teacher teacher = teacherMap.get(teacherId);
+    TeacherDTO teacherDTO = new TeacherDTO(
+      teacher.getId(),
+      teacher.getName()
+    );
+    return new CourseDTO(
+      course.getId(),
+      course.getTitle(),
+      teacherDTO
+    );
+  }
+
+  private static ResponseStudentDTO getResponseStudentDTO(Student student, Set<CourseDTO> courseDTOS) {
+    return new ResponseStudentDTO(student.getId(),
+      student.getName(),
+      student.getEmail(),
+      courseDTOS);
   }
 }

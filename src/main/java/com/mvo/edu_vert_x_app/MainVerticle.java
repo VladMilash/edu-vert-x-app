@@ -3,7 +3,11 @@ package com.mvo.edu_vert_x_app;
 import com.mvo.edu_vert_x_app.config.DbConfig;
 import com.mvo.edu_vert_x_app.config.FlywayConfig;
 import com.mvo.edu_vert_x_app.controller.StudentController;
+import com.mvo.edu_vert_x_app.exception.GlobalErrorHandler;
+import com.mvo.edu_vert_x_app.mapper.CourseMapper;
+import com.mvo.edu_vert_x_app.mapper.StudentCourseMapper;
 import com.mvo.edu_vert_x_app.mapper.StudentMapper;
+import com.mvo.edu_vert_x_app.mapper.TeacherMapper;
 import com.mvo.edu_vert_x_app.repository.CourseRepository;
 import com.mvo.edu_vert_x_app.repository.StudentCourseRepository;
 import com.mvo.edu_vert_x_app.repository.StudentRepository;
@@ -33,9 +37,12 @@ public class MainVerticle extends VerticleBase {
 
     StudentMapper studentMapper = new StudentMapper();
     StudentRepository studentRepository = new StudentRepository(studentMapper);
-    StudentCourseRepository studentCourseRepository = new StudentCourseRepository();
-    CourseRepository courseRepository = new CourseRepository();
-    TeacherRepository teacherRepository = new TeacherRepository();
+    StudentCourseMapper studentCourseMapper = new StudentCourseMapper();
+    CourseMapper courseMapper = new CourseMapper();
+    TeacherMapper teacherMapper = new TeacherMapper();
+    StudentCourseRepository studentCourseRepository = new StudentCourseRepository(studentCourseMapper);
+    CourseRepository courseRepository = new CourseRepository(courseMapper);
+    TeacherRepository teacherRepository = new TeacherRepository(teacherMapper);
     StudentService studentService = new StudentServiceImpl(studentRepository, studentMapper,
       studentCourseRepository, courseRepository, teacherRepository);
     studentController = new StudentController(client, studentService);
@@ -72,6 +79,7 @@ public class MainVerticle extends VerticleBase {
   private Router getRouter() {
     Router router = Router.router(vertx);
     router.route().handler(BodyHandler.create());
+    router.route().failureHandler(new GlobalErrorHandler());
     return router;
   }
 

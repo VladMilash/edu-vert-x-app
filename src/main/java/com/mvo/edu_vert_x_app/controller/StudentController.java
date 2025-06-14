@@ -54,8 +54,6 @@ public class StudentController {
           .putHeader("Content-Type", "application/json")
           .end(responseBody.encode());
       })
-      .onFailure(error -> context.response()
-        .setStatusCode(500)
-        .end("Error: " + error.getMessage()));
+      .onFailure(context::fail);
   }
 }
