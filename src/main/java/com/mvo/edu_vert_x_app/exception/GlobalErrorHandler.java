@@ -28,6 +28,7 @@ public class GlobalErrorHandler implements Handler<RoutingContext> {
   private int determineStatusCode(Throwable error) {
     return switch (error) {
       case NotFoundEntityException exception -> 404;
+      case BadRequestException exception -> 400;
       default -> 500;
     };
   }

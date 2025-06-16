@@ -64,6 +64,94 @@ public class StudentServiceImpl implements StudentService {
       });
   }
 
+  //TODO сделать рефакторинг этой логики
+  @Override
+  public Future<List<ResponseStudentDTO>> getAll(int page, int size, Pool client) {
+    int offset = page * size;
+
+    return studentRepository.getAll(size, offset, client)
+      .compose(students -> {
+        List<Long> studentsIds = students
+          .stream()
+          .map(Student::getId)
+          .toList();
+
+        if (studentsIds.isEmpty()) {
+          return Future.succeededFuture(Collections.emptyList());
+        }
+
+        return studentCourseRepository.getByStudentIdIn(studentsIds, client)
+          .compose(studentCourseList -> loadStudentData(students, studentCourseList, client));
+
+      });
+
+  }
+
+  private Future<List<ResponseStudentDTO>> loadStudentData(List<Student> students,
+                                                           List<StudentCourse> studentCourseList,
+                                                           Pool client) {
+    if (studentCourseList.isEmpty()) {
+      return Future.succeededFuture(studentMapper.fromStudentToResponseStudentDTO(students));
+    }
+    List<Long> courseIds = getEntityIdsAsList(studentCourseList, StudentCourse::getCourseId);
+    Map<Long, List<Long>> studentToCourseIds = studentCourseList
+      .stream()
+      .collect(Collectors.groupingBy(
+        StudentCourse::getStudentId,
+        Collectors.mapping(StudentCourse::getCourseId, Collectors.toList())
+      ));
+
+    return courseRepository.getByIdIn(courseIds, client)
+      .compose(courses -> {
+        List<Long> teacherIds = courses
+          .stream()
+          .map(Course::getTeacherId)
+          .toList();
+
+        Map<Long, Course> courseMap = courses.stream()
+          .collect(Collectors.toMap(Course::getId, c -> c));
+
+        return teacherRepository.getByIdIn(teacherIds, client)
+          .compose(teachers -> {
+            Map<Long, Teacher> teacherMap = teachers.stream()
+              .collect(Collectors.toMap(Teacher::getId, t -> t));
+
+            List<ResponseStudentDTO> responseStudentDTOS =
+
+              students.stream()
+                .map(student -> {
+                  Set<CourseDTO> courseDTOSet = studentToCourseIds.getOrDefault(student.getId(), Collections.emptyList())
+                    .stream()
+                    .map(courseMap::get)
+                    .filter(Objects::nonNull)
+                    .map(course -> {
+                      return new CourseDTO(
+                        course.getId(),
+                        course.getTitle(),
+                        Optional.ofNullable(course.getTeacherId())
+                          .map(teacherId -> new TeacherDTO(
+                            teacherId,
+                            teacherMap.get(teacherId).getName()))
+                          .orElse(null)
+                      );
+                    })
+                    .collect(Collectors.toSet());
+
+                  return new ResponseStudentDTO(
+                    student.getId(),
+                    student.getName(),
+                    student.getEmail(),
+                    courseDTOSet
+                  );
+
+                }).toList();
+            return Future.succeededFuture(responseStudentDTOS);
+
+          });
+
+      });
+  }
+
   private Future<ResponseStudentDTO> loadStudentData(Student student,
                                                      List<StudentCourse> studentCourseList,
                                                      Pool client) {

@@ -55,6 +55,7 @@ public class MainVerticle extends VerticleBase {
   private void configureRoutes(Router router) {
     router.post("/api/v1/students").handler(context -> studentController.saveStudent(context));
     router.get("/api/v1/students/:id").handler(context1 -> studentController.getById(context1));
+    router.get("/api/v1/students/").handler(context1 -> studentController.getAll(context1));
   }
 
   private Pool getPool() {

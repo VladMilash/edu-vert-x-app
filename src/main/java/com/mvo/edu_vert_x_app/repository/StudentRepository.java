@@ -9,6 +9,8 @@ import io.vertx.sqlclient.Pool;
 import io.vertx.sqlclient.Tuple;
 import io.vertx.core.Future;
 
+import java.util.*;
+
 public class StudentRepository {
   private final StudentMapper studentMapper;
 
@@ -42,6 +44,20 @@ public class StudentRepository {
       })
     );
   }
+
+  public Future<List<Student>> getAll(int limit, int offset, Pool client) {
+    return client.withConnection(conn ->
+      conn.preparedQuery("""
+          SELECT *
+          FROM student
+          LIMIT $1
+          OFFSET $2
+          """)
+        .execute(Tuple.of(limit, offset))
+        .map(studentMapper::fromRowsToStudent)
+    );
+  }
+
 }
 
 

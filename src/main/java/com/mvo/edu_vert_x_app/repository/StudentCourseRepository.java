@@ -27,4 +27,17 @@ public class StudentCourseRepository {
           .map(studentCourseMapper::fromRowsToStudentCoursesList)
       );
   }
+
+  public Future<List<StudentCourse>> getByStudentIdIn(List<Long> studentsIds, Pool client) {
+    if (studentsIds.isEmpty()) {
+      return Future.succeededFuture(Collections.emptyList());
+    }
+    String sql = "SELECT * FROM student_course WHERE student_id = ANY($1::bigint[])";
+    Tuple params = Tuple.of(studentsIds.toArray(new Long[0]));
+    return client
+      .withConnection(conn ->
+        conn.preparedQuery(sql).execute(params)
+          .map(studentCourseMapper::fromRowsToStudentCoursesList)
+      );
+  }
 }

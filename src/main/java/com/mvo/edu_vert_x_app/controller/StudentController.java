@@ -1,10 +1,17 @@
 package com.mvo.edu_vert_x_app.controller;
 
+import com.mvo.edu_vert_x_app.dto.CourseDTO;
 import com.mvo.edu_vert_x_app.dto.request.StudentTransientDTO;
+import com.mvo.edu_vert_x_app.dto.response.ResponseStudentDTO;
+import com.mvo.edu_vert_x_app.exception.BadRequestException;
 import com.mvo.edu_vert_x_app.service.StudentService;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.sqlclient.Pool;
+
+import java.util.List;
+import java.util.Set;
 
 public class StudentController {
   private final Pool client;
@@ -55,5 +62,72 @@ public class StudentController {
           .end(responseBody.encode());
       })
       .onFailure(context::fail);
+  }
+
+  public void getAll(RoutingContext context) {
+    int page = getIntParam(context, "page", 0);
+    int size = getIntParam(context, "size", 10);
+
+    studentService.getAll(page, size, client)
+      .onSuccess(responseStudentDTOS -> {
+        formatResponse(context, responseStudentDTOS);
+      });
+  }
+
+  private void formatResponse(RoutingContext context, List<ResponseStudentDTO> responseStudentDTOS) {
+    JsonArray jsonArray = new JsonArray();
+    responseStudentDTOS.forEach(studentDTO ->
+      jsonArray.add(new JsonObject()
+          .put("id", studentDTO.id())
+          .put("name", studentDTO.name())
+          .put("email", studentDTO.email())
+          .put("courses", convertCoursesToJson(studentDTO.courses()))
+      )
+    );
+    context.response()
+      .setStatusCode(200)
+      .putHeader("Content-Type", "application/json")
+      .end(jsonArray.encode())
+      .onFailure(context::fail);
+  }
+
+  private JsonArray convertCoursesToJson(Set<CourseDTO> courses) {
+    JsonArray jsonArray = new JsonArray();
+    if (courses.isEmpty()) {
+      return jsonArray;
+    }
+    courses.forEach(courseDTO ->
+      jsonArray.add(
+        new JsonObject()
+          .put("id", courseDTO.id())
+          .put("title", courseDTO.title())
+          .put("teacher",
+            courseDTO.teacher() == null
+              ? null
+              : new JsonObject()
+              .put("id", courseDTO.teacher().id())
+              .put("name", courseDTO.teacher().name())
+          )
+      )
+    );
+    return jsonArray;
+  }
+
+  private int getIntParam(RoutingContext context, String paramName, int defaultValue) {
+    String param = context.queryParam(paramName)
+      .stream()
+      .findFirst()
+      .orElse(null);
+
+    if ((param == null) || param.isEmpty()) {
+      return defaultValue;
+    }
+
+    try {
+      return Integer.parseInt(param);
+    } catch (NumberFormatException e) {
+      context.fail(new BadRequestException(String.format("Invalid %s value %s", paramName, param)));
+      return defaultValue;
+    }
   }
 }
