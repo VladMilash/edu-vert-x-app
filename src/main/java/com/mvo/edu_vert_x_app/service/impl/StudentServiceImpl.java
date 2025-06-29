@@ -64,27 +64,19 @@ public class StudentServiceImpl implements StudentService {
       });
   }
 
-  //TODO сделать рефакторинг этой логики
+  //TODO сделать рефакторинг этой логики. Нужнео продолжить в того места, где создается List<ResponseStudentDTO>
   @Override
   public Future<List<ResponseStudentDTO>> getAll(int page, int size, Pool client) {
     int offset = page * size;
-
     return studentRepository.getAll(size, offset, client)
       .compose(students -> {
-        List<Long> studentsIds = students
-          .stream()
-          .map(Student::getId)
-          .toList();
-
+        List<Long> studentsIds = getEntityIdsAsList(students, Student::getId);
         if (studentsIds.isEmpty()) {
           return Future.succeededFuture(Collections.emptyList());
         }
-
         return studentCourseRepository.getByStudentIdIn(studentsIds, client)
           .compose(studentCourseList -> loadStudentData(students, studentCourseList, client));
-
       });
-
   }
 
   private Future<List<ResponseStudentDTO>> loadStudentData(List<Student> students,
@@ -94,62 +86,37 @@ public class StudentServiceImpl implements StudentService {
       return Future.succeededFuture(studentMapper.fromStudentToResponseStudentDTO(students));
     }
     List<Long> courseIds = getEntityIdsAsList(studentCourseList, StudentCourse::getCourseId);
-    Map<Long, List<Long>> studentToCourseIds = studentCourseList
-      .stream()
-      .collect(Collectors.groupingBy(
-        StudentCourse::getStudentId,
-        Collectors.mapping(StudentCourse::getCourseId, Collectors.toList())
-      ));
-
+    Map<Long, List<Long>> studentToCourseIds = getMapStudentToCourseIds(studentCourseList);
     return courseRepository.getByIdIn(courseIds, client)
       .compose(courses -> {
-        List<Long> teacherIds = courses
-          .stream()
-          .map(Course::getTeacherId)
-          .toList();
-
-        Map<Long, Course> courseMap = courses.stream()
-          .collect(Collectors.toMap(Course::getId, c -> c));
-
+        List<Long> teacherIds = getEntityIdsAsList(courses, Course::getTeacherId);
+        Map<Long, Course> courseMap = getEntityMap(courses, Course::getId);
         return teacherRepository.getByIdIn(teacherIds, client)
           .compose(teachers -> {
-            Map<Long, Teacher> teacherMap = teachers.stream()
-              .collect(Collectors.toMap(Teacher::getId, t -> t));
-
+            Map<Long, Teacher> teacherMap = getEntityMap(teachers, Teacher::getId);
             List<ResponseStudentDTO> responseStudentDTOS =
-
               students.stream()
                 .map(student -> {
                   Set<CourseDTO> courseDTOSet = studentToCourseIds.getOrDefault(student.getId(), Collections.emptyList())
                     .stream()
                     .map(courseMap::get)
                     .filter(Objects::nonNull)
-                    .map(course -> {
-                      return new CourseDTO(
-                        course.getId(),
-                        course.getTitle(),
-                        Optional.ofNullable(course.getTeacherId())
-                          .map(teacherId -> new TeacherDTO(
-                            teacherId,
-                            teacherMap.get(teacherId).getName()))
-                          .orElse(null)
-                      );
-                    })
+                    .map(course -> getCourseDTO(course,teacherMap))
                     .collect(Collectors.toSet());
-
-                  return new ResponseStudentDTO(
-                    student.getId(),
-                    student.getName(),
-                    student.getEmail(),
-                    courseDTOSet
-                  );
-
+                  return getResponseStudentDTO(student, courseDTOSet);
                 }).toList();
             return Future.succeededFuture(responseStudentDTOS);
-
           });
-
       });
+  }
+
+  private static Map<Long, List<Long>> getMapStudentToCourseIds(List<StudentCourse> studentCourseList) {
+    return studentCourseList
+      .stream()
+      .collect(Collectors.groupingBy(
+        StudentCourse::getStudentId,
+        Collectors.mapping(StudentCourse::getCourseId, Collectors.toList())
+      ));
   }
 
   private Future<ResponseStudentDTO> loadStudentData(Student student,
@@ -172,26 +139,24 @@ public class StudentServiceImpl implements StudentService {
       });
   }
 
-  private static <T> List<Long> getEntityIdsAsList(List<T> list, Function<T,Long> function) {
-    return list
+  private static <T> Map<Long, T> getEntityMap(List<T> entities, Function<T, Long> function) {
+    return entities
+      .stream()
+      .collect(Collectors.toMap(function, Function.identity()));
+  }
+
+  private static <T> List<Long> getEntityIdsAsList(List<T> entities, Function<T, Long> function) {
+    return entities
       .stream()
       .map(function)
       .toList();
   }
 
   private static Set<CourseDTO> getCourseDTOSet(List<Teacher> teachers, List<Course> courses) {
-    Map<Long, Teacher> teacherMap = teachers
-      .stream()
-      .collect(Collectors.toMap(Teacher::getId, Function.identity()));
-
+    Map<Long, Teacher> teacherMap = getEntityMap(teachers, Teacher::getId);
     return courses
       .stream()
-      .map(course -> {
-        if (!teacherMap.isEmpty() && course.getTeacherId() != null && teacherMap.containsKey(course.getTeacherId())) {
-          return getCourseDTO(course, teacherMap);
-        }
-        return getCourseDTO(course);
-      })
+      .map(course -> getCourseDTO(course, teacherMap))
       .collect(Collectors.toSet());
   }
 
@@ -204,21 +169,24 @@ public class StudentServiceImpl implements StudentService {
   }
 
   private static CourseDTO getCourseDTO(Course course, Map<Long, Teacher> teacherMap) {
-    Long teacherId = course.getTeacherId();
-    Teacher teacher = teacherMap.get(teacherId);
-    TeacherDTO teacherDTO = new TeacherDTO(
-      teacher.getId(),
-      teacher.getName()
-    );
-    return new CourseDTO(
-      course.getId(),
-      course.getTitle(),
-      teacherDTO
-    );
+    if (course.getTeacherId() != null && teacherMap.containsKey(course.getTeacherId())) {
+      Teacher teacher = teacherMap.get(course.getTeacherId());
+      TeacherDTO teacherDTO = new TeacherDTO(
+        teacher.getId(),
+        teacher.getName()
+      );
+      return new CourseDTO(
+        course.getId(),
+        course.getTitle(),
+        teacherDTO
+      );
+    }
+    return getCourseDTO(course);
   }
 
   private static ResponseStudentDTO getResponseStudentDTO(Student student, Set<CourseDTO> courseDTOS) {
-    return new ResponseStudentDTO(student.getId(),
+    return new ResponseStudentDTO(
+      student.getId(),
       student.getName(),
       student.getEmail(),
       courseDTOS);
