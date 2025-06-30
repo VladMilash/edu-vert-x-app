@@ -64,7 +64,7 @@ public class StudentServiceImpl implements StudentService {
       });
   }
 
-  //TODO сделать рефакторинг этой логики. Нужнео продолжить в того места, где создается List<ResponseStudentDTO>
+  //TODO сделать рефакторинг этой логики. Нужно попробовать объединить методы loadStudentData
   @Override
   public Future<List<ResponseStudentDTO>> getAll(int page, int size, Pool client) {
     int offset = page * size;
@@ -86,28 +86,41 @@ public class StudentServiceImpl implements StudentService {
       return Future.succeededFuture(studentMapper.fromStudentToResponseStudentDTO(students));
     }
     List<Long> courseIds = getEntityIdsAsList(studentCourseList, StudentCourse::getCourseId);
-    Map<Long, List<Long>> studentToCourseIds = getMapStudentToCourseIds(studentCourseList);
     return courseRepository.getByIdIn(courseIds, client)
       .compose(courses -> {
         List<Long> teacherIds = getEntityIdsAsList(courses, Course::getTeacherId);
-        Map<Long, Course> courseMap = getEntityMap(courses, Course::getId);
         return teacherRepository.getByIdIn(teacherIds, client)
           .compose(teachers -> {
-            Map<Long, Teacher> teacherMap = getEntityMap(teachers, Teacher::getId);
-            List<ResponseStudentDTO> responseStudentDTOS =
-              students.stream()
-                .map(student -> {
-                  Set<CourseDTO> courseDTOSet = studentToCourseIds.getOrDefault(student.getId(), Collections.emptyList())
-                    .stream()
-                    .map(courseMap::get)
-                    .filter(Objects::nonNull)
-                    .map(course -> getCourseDTO(course,teacherMap))
-                    .collect(Collectors.toSet());
-                  return getResponseStudentDTO(student, courseDTOSet);
-                }).toList();
+            List<ResponseStudentDTO> responseStudentDTOS = getResponseStudentDTOS(students, courses, teachers, studentCourseList);
             return Future.succeededFuture(responseStudentDTOS);
           });
       });
+  }
+
+  private static List<ResponseStudentDTO> getResponseStudentDTOS(List<Student> students,
+                                                                 List<Course> courses,
+                                                                 List<Teacher> teachers,
+                                                                 List<StudentCourse> studentCourseList) {
+    Map<Long, List<Long>> studentToCourseIds = getMapStudentToCourseIds(studentCourseList);
+    return students.stream()
+      .map(student -> {
+        Set<CourseDTO> courseDTOSet = getCourseDTOSet(student, studentToCourseIds, courses, teachers);
+        return getResponseStudentDTO(student, courseDTOSet);
+      }).toList();
+  }
+
+  private static Set<CourseDTO> getCourseDTOSet(Student student,
+                                                Map<Long, List<Long>> studentToCourseIds,
+                                                List<Course> courses,
+                                                List<Teacher> teachers) {
+    Map<Long, Teacher> teacherMap = getEntityMap(teachers, Teacher::getId);
+    Map<Long, Course> courseMap = getEntityMap(courses, Course::getId);
+    return studentToCourseIds.getOrDefault(student.getId(), Collections.emptyList())
+      .stream()
+      .map(courseMap::get)
+      .filter(Objects::nonNull)
+      .map(course -> getCourseDTO(course, teacherMap))
+      .collect(Collectors.toSet());
   }
 
   private static Map<Long, List<Long>> getMapStudentToCourseIds(List<StudentCourse> studentCourseList) {
