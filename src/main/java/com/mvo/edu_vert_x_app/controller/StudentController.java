@@ -22,6 +22,28 @@ public class StudentController {
     this.studentService = studentService;
   }
 
+  public void updateStudent(RoutingContext context) {
+    JsonObject body = context.body().asJsonObject();
+    var studentTransientDTO = new StudentTransientDTO(body.getString("name"), body.getString("email"));
+    String stringId = context.pathParam("id");
+    Long id = Long.valueOf(stringId);
+    studentService.update(id, studentTransientDTO, client)
+      .onSuccess(responseStudentDTO -> {
+        JsonObject responseBody = new JsonObject();
+        responseBody.put("id", responseStudentDTO.id());
+        responseBody.put("name", responseStudentDTO.name());
+        responseBody.put("email", responseStudentDTO.email());
+        responseBody.put("courses", responseStudentDTO.courses());
+
+        context.response()
+          .setStatusCode(200)
+          .putHeader("Content-Type", "application/json")
+          .end(responseBody.encode());
+      })
+      .onFailure(context::fail);
+
+  }
+
   public void saveStudent(RoutingContext context) {
     JsonObject body = context.body().asJsonObject();
     var studentTransientDTO = new StudentTransientDTO(body.getString("name"), body.getString("email"));

@@ -43,6 +43,17 @@ public class StudentServiceImpl implements StudentService {
   }
 
   @Override
+  public Future<ResponseStudentDTO> update(long id, StudentTransientDTO studentTransientDTO, Pool client) {
+    return studentRepository.getById(id, client)
+      .compose(student -> {
+        student.setName(studentTransientDTO.name());
+        student.setEmail(studentTransientDTO.email());
+        return studentRepository.update(student, client)
+          .compose(v -> getById(id, client));
+      });
+  }
+
+  @Override
   public Future<ResponseStudentDTO> save(StudentTransientDTO studentTransientDTO, Pool client) {
     logger.info("Saving student with email: {}", studentTransientDTO.email());
     return studentRepository.save(studentTransientDTO, client)
@@ -63,8 +74,6 @@ public class StudentServiceImpl implements StudentService {
         return loadStudentData(student, studentCourseList, client);
       });
   }
-
-  //TODO сделать рефакторинг этой логики. Нужно попробовать объединить методы loadStudentData
   @Override
   public Future<List<ResponseStudentDTO>> getAll(int page, int size, Pool client) {
     int offset = page * size;
@@ -91,16 +100,16 @@ public class StudentServiceImpl implements StudentService {
         List<Long> teacherIds = getEntityIdsAsList(courses, Course::getTeacherId);
         return teacherRepository.getByIdIn(teacherIds, client)
           .compose(teachers -> {
-            List<ResponseStudentDTO> responseStudentDTOS = getResponseStudentDTOS(students, courses, teachers, studentCourseList);
+            List<ResponseStudentDTO> responseStudentDTOS = mapToResponseStudentDTOs(students, courses, teachers, studentCourseList);
             return Future.succeededFuture(responseStudentDTOS);
           });
       });
   }
 
-  private static List<ResponseStudentDTO> getResponseStudentDTOS(List<Student> students,
-                                                                 List<Course> courses,
-                                                                 List<Teacher> teachers,
-                                                                 List<StudentCourse> studentCourseList) {
+  private static List<ResponseStudentDTO> mapToResponseStudentDTOs(List<Student> students,
+                                                                   List<Course> courses,
+                                                                   List<Teacher> teachers,
+                                                                   List<StudentCourse> studentCourseList) {
     Map<Long, List<Long>> studentToCourseIds = getMapStudentToCourseIds(studentCourseList);
     return students.stream()
       .map(student -> {

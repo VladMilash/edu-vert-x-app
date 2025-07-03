@@ -18,6 +18,19 @@ public class StudentRepository {
     this.studentMapper = studentMapper;
   }
 
+  public Future<Void> update(Student student, Pool client) {
+    return client.withTransaction(conn -> conn
+      .preparedQuery("""
+        UPDATE student
+        SET name = $1,
+            email = $2
+        WHERE id = $3
+        """)
+      .execute(Tuple.of(student.getName(), student.getEmail(), student.getId()))
+      .mapEmpty()
+    );
+  }
+
   public Future<Student> save(StudentTransientDTO studentTransientDTO, Pool client) {
     return client.getConnection().compose(conn -> conn
       .preparedQuery("""

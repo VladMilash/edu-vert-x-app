@@ -14,4 +14,6 @@ public interface StudentService {
 
   Future<List<ResponseStudentDTO>> getAll(int page, int size, Pool client);
 
+  Future<ResponseStudentDTO> update(long id, StudentTransientDTO studentTransientDTO, Pool client);
+
 }
