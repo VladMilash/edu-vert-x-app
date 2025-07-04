@@ -18,6 +18,17 @@ public class StudentRepository {
     this.studentMapper = studentMapper;
   }
 
+  public Future<Void> delete(Long id, Pool client) {
+    return client.withConnection(conn -> conn
+      .preparedQuery("""
+        DELETE FROM student
+        where id = $1
+        """)
+      .execute(Tuple.of(id))
+      .mapEmpty()
+    );
+  }
+
   public Future<Void> update(Student student, Pool client) {
     return client.withTransaction(conn -> conn
       .preparedQuery("""

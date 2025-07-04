@@ -3,6 +3,7 @@ package com.mvo.edu_vert_x_app.service.impl;
 import com.mvo.edu_vert_x_app.dto.CourseDTO;
 import com.mvo.edu_vert_x_app.dto.TeacherDTO;
 import com.mvo.edu_vert_x_app.dto.request.StudentTransientDTO;
+import com.mvo.edu_vert_x_app.dto.response.DeleteResponseDTO;
 import com.mvo.edu_vert_x_app.dto.response.ResponseStudentDTO;
 import com.mvo.edu_vert_x_app.entity.Course;
 import com.mvo.edu_vert_x_app.entity.Student;
@@ -40,6 +41,13 @@ public class StudentServiceImpl implements StudentService {
     this.studentCourseRepository = studentCourseRepository;
     this.courseRepository = courseRepository;
     this.teacherRepository = teacherRepository;
+  }
+
+  @Override
+  public Future<DeleteResponseDTO> delete(Long id, Pool client) {
+    return studentRepository.getById(id, client)
+      .compose(student -> studentRepository.delete(id,client)
+        .map(new DeleteResponseDTO("Student deleted successfully")));
   }
 
   @Override

@@ -22,6 +22,22 @@ public class StudentController {
     this.studentService = studentService;
   }
 
+  public void deleteStudent(RoutingContext context) {
+    String stringId = context.pathParam("id");
+    Long id = Long.valueOf(stringId);
+    studentService.delete(id, client)
+      .onSuccess(deleteResponseDTO -> {
+        JsonObject responseBody = new JsonObject();
+        responseBody.put("message", deleteResponseDTO.message());
+        context.response()
+          .setStatusCode(200)
+          .putHeader("Content-Type", "application/json")
+          .end(responseBody.encode());
+      })
+      .onFailure(context::fail);
+
+  }
+
   public void updateStudent(RoutingContext context) {
     JsonObject body = context.body().asJsonObject();
     var studentTransientDTO = new StudentTransientDTO(body.getString("name"), body.getString("email"));
