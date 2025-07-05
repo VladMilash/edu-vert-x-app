@@ -53,20 +53,21 @@ public class StudentRepository {
   }
 
   public Future<Student> getById(Long id, Pool client) {
-    return client.getConnection().compose(conn -> conn
-      .preparedQuery("""
+    return client.getConnection().compose(conn -> {
+      return conn
+        .preparedQuery("""
         SELECT * FROM student
         WHERE id = $1
         """)
-      .execute(Tuple.of(id))
-      .onComplete(ar -> conn.close())
-      .map(rows -> {
-        if (rows.size() == 0) {
-          throw new NotFoundEntityException(String.format("Student with id: %d not found", id));
-        }
-        return studentMapper.fromRowToStudent(rows);
-      })
-    );
+        .execute(Tuple.of(id))
+        .map(rows -> {
+          if (rows.size() == 0) {
+            throw new NotFoundEntityException(String.format("Student with id: %d not found", id));
+          }
+          return studentMapper.fromRowToStudent(rows);
+        })
+        .onComplete(ar -> conn.close());
+    });
   }
 
   public Future<List<Student>> getAll(int limit, int offset, Pool client) {

@@ -43,6 +43,30 @@ public class StudentServiceImpl implements StudentService {
     this.teacherRepository = teacherRepository;
   }
 
+
+  @Override
+  public Future<List<CourseDTO>> getStudentCourses(Long id, Pool client) {
+    return studentRepository.getById(id, client)
+      .compose(student -> {
+        return studentCourseRepository.getByStudentId(id, client)
+          .compose(studentCourseList -> {
+            List<Long> courseIds = getEntityIdsAsList(studentCourseList, StudentCourse::getCourseId);
+            if (courseIds.isEmpty()) {
+              return Future.succeededFuture(Collections.emptyList());
+            }
+            return courseRepository.getByIdIn(courseIds, client)
+              .compose(courses -> {
+                List<Long> teacherIds = getEntityIdsAsList(courses, Course::getTeacherId);
+                return teacherRepository.getByIdIn(teacherIds, client)
+                  .compose(teachers -> {
+                    List<CourseDTO> courseDTOS = getCourseDTOasList(courses, teachers);
+                    return Future.succeededFuture(courseDTOS);
+                  });
+              });
+          });
+      });
+  }
+
   @Override
   public Future<DeleteResponseDTO> delete(Long id, Pool client) {
     return studentRepository.getById(id, client)
@@ -94,6 +118,12 @@ public class StudentServiceImpl implements StudentService {
         return studentCourseRepository.getByStudentIdIn(studentsIds, client)
           .compose(studentCourseList -> loadStudentData(students, studentCourseList, client));
       });
+  }
+
+  private static List<CourseDTO> getCourseDTOasList(List<Course> courses, List<Teacher> teachers) {
+    Map<Long, Teacher> teacherMap = getEntityMap(teachers, Teacher::getId);
+    return courses.stream()
+      .map(course -> getCourseDTO(course, teacherMap)).toList();
   }
 
   private Future<List<ResponseStudentDTO>> loadStudentData(List<Student> students,
@@ -174,6 +204,7 @@ public class StudentServiceImpl implements StudentService {
       .stream()
       .collect(Collectors.toMap(function, Function.identity()));
   }
+
 
   private static <T> List<Long> getEntityIdsAsList(List<T> entities, Function<T, Long> function) {
     return entities

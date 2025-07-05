@@ -1,5 +1,6 @@
 package com.mvo.edu_vert_x_app.service;
 
+import com.mvo.edu_vert_x_app.dto.CourseDTO;
 import com.mvo.edu_vert_x_app.dto.request.StudentTransientDTO;
 import com.mvo.edu_vert_x_app.dto.response.DeleteResponseDTO;
 import com.mvo.edu_vert_x_app.dto.response.ResponseStudentDTO;
@@ -18,5 +19,7 @@ public interface StudentService {
   Future<ResponseStudentDTO> update(long id, StudentTransientDTO studentTransientDTO, Pool client);
 
   Future<DeleteResponseDTO> delete(Long id, Pool client);
+
+  Future<List<CourseDTO>> getStudentCourses(Long id, Pool client);
 
 }

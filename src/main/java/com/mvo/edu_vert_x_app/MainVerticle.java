@@ -58,6 +58,7 @@ public class MainVerticle extends VerticleBase {
     router.get("/api/v1/students/").handler(context1 -> studentController.getAll(context1));
     router.put("/api/v1/students/:id").handler(context1 -> studentController.updateStudent(context1));
     router.delete("/api/v1/students/:id").handler(context1 -> studentController.deleteStudent(context1));
+    router.get("/api/v1/students/:id/courses").handler(context1 -> studentController.getStudentCourses(context1));
   }
 
   private Pool getPool() {
@@ -85,6 +86,5 @@ public class MainVerticle extends VerticleBase {
     router.route().failureHandler(new GlobalErrorHandler());
     return router;
   }
-
 
 }

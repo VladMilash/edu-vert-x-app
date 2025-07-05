@@ -10,8 +10,7 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.sqlclient.Pool;
 
-import java.util.List;
-import java.util.Set;
+import java.util.Collection;
 
 public class StudentController {
   private final Pool client;
@@ -20,6 +19,16 @@ public class StudentController {
   public StudentController(Pool client, StudentService studentService) {
     this.client = client;
     this.studentService = studentService;
+  }
+
+  public void getStudentCourses(RoutingContext context) {
+    String stringId = context.pathParam("id");
+    Long id = Long.valueOf(stringId);
+    studentService.getStudentCourses(id, client)
+      .onSuccess(courseDTOS -> {
+        buildResponseBodyAsCourseDTOJsonArray(context, courseDTOS);
+      })
+      .onFailure(context::fail);
   }
 
   public void deleteStudent(RoutingContext context) {
@@ -108,11 +117,20 @@ public class StudentController {
 
     studentService.getAll(page, size, client)
       .onSuccess(responseStudentDTOS -> {
-        formatResponse(context, responseStudentDTOS);
-      });
+        buildResponseBodyAsResponseStudentDTOJsonArray(context, responseStudentDTOS);
+      })
+      .onFailure(context::fail);
   }
 
-  private void formatResponse(RoutingContext context, List<ResponseStudentDTO> responseStudentDTOS) {
+  private void buildResponseBodyAsCourseDTOJsonArray(RoutingContext context, Collection<CourseDTO> courseDTOS) {
+    JsonArray jsonArray = convertCoursesToJson(courseDTOS);
+    context.response()
+      .setStatusCode(200)
+      .putHeader("Content-Type", "application/json")
+      .end(jsonArray.encode());
+  }
+
+  private void buildResponseBodyAsResponseStudentDTOJsonArray(RoutingContext context, Collection<ResponseStudentDTO> responseStudentDTOS) {
     JsonArray jsonArray = new JsonArray();
     responseStudentDTOS.forEach(studentDTO ->
       jsonArray.add(new JsonObject()
@@ -125,11 +143,10 @@ public class StudentController {
     context.response()
       .setStatusCode(200)
       .putHeader("Content-Type", "application/json")
-      .end(jsonArray.encode())
-      .onFailure(context::fail);
+      .end(jsonArray.encode());
   }
 
-  private JsonArray convertCoursesToJson(Set<CourseDTO> courses) {
+  private JsonArray convertCoursesToJson(Collection<CourseDTO> courses) {
     JsonArray jsonArray = new JsonArray();
     if (courses.isEmpty()) {
       return jsonArray;
