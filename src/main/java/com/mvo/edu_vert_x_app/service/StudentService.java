@@ -22,4 +22,6 @@ public interface StudentService {
 
   Future<List<CourseDTO>> getStudentCourses(Long id, Pool client);
 
+  Future<ResponseStudentDTO> setRelationWithCourse(Long studentId, Long courseId, Pool client);
+
 }

@@ -21,6 +21,28 @@ public class StudentController {
     this.studentService = studentService;
   }
 
+  public void setRelationWithCourse(RoutingContext context) {
+    String stringCourseId = context.pathParam("courseId");
+    String stringStudentId = context.pathParam("studentId");
+    Long courseId = Long.valueOf(stringCourseId);
+    Long studentId = Long.valueOf(stringStudentId);
+
+    studentService.setRelationWithCourse(studentId,courseId, client)
+      .onSuccess(responseStudentDTO -> {
+        JsonObject responseBody = new JsonObject();
+        responseBody.put("id", responseStudentDTO.id());
+        responseBody.put("name", responseStudentDTO.name());
+        responseBody.put("email", responseStudentDTO.email());
+        responseBody.put("courses", responseStudentDTO.courses());
+
+        context.response()
+          .setStatusCode(200)
+          .putHeader("Content-Type", "application/json")
+          .end(responseBody.encode());
+      })
+      .onFailure(context::fail);
+  }
+
   public void getStudentCourses(RoutingContext context) {
     String stringId = context.pathParam("id");
     Long id = Long.valueOf(stringId);

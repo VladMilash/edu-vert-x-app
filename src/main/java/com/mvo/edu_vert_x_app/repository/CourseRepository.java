@@ -1,6 +1,8 @@
 package com.mvo.edu_vert_x_app.repository;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.mvo.edu_vert_x_app.entity.Course;
+import com.mvo.edu_vert_x_app.exception.NotFoundEntityException;
 import com.mvo.edu_vert_x_app.mapper.CourseMapper;
 import io.vertx.core.Future;
 import io.vertx.sqlclient.Pool;
@@ -28,5 +30,22 @@ public class CourseRepository {
         conn.preparedQuery(sql).execute(params)
           .map(courseMapper::fromRowsToCoursesList)
       );
+  }
+
+  public Future<Course> getById(Long id, Pool client) {
+    return client.withConnection(conn -> conn
+      .preparedQuery("""
+        SELECT *
+        FROM course
+        WHERE id = $1
+        """)
+      .execute(Tuple.of(id))
+      .map(rows -> {
+        if (rows.size() == 0) {
+          throw new NotFoundEntityException(String.format("Course with id: %d not found", id));
+        }
+        return courseMapper.fromRowToCourse(rows);
+      })
+    );
   }
 }

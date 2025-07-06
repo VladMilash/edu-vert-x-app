@@ -2,6 +2,7 @@ package com.mvo.edu_vert_x_app.service.impl;
 
 import com.mvo.edu_vert_x_app.dto.CourseDTO;
 import com.mvo.edu_vert_x_app.dto.TeacherDTO;
+import com.mvo.edu_vert_x_app.dto.request.StudentCourseTransientDTO;
 import com.mvo.edu_vert_x_app.dto.request.StudentTransientDTO;
 import com.mvo.edu_vert_x_app.dto.response.DeleteResponseDTO;
 import com.mvo.edu_vert_x_app.dto.response.ResponseStudentDTO;
@@ -9,6 +10,7 @@ import com.mvo.edu_vert_x_app.entity.Course;
 import com.mvo.edu_vert_x_app.entity.Student;
 import com.mvo.edu_vert_x_app.entity.StudentCourse;
 import com.mvo.edu_vert_x_app.entity.Teacher;
+import com.mvo.edu_vert_x_app.exception.AlReadyExistException;
 import com.mvo.edu_vert_x_app.mapper.StudentMapper;
 import com.mvo.edu_vert_x_app.repository.CourseRepository;
 import com.mvo.edu_vert_x_app.repository.StudentCourseRepository;
@@ -43,28 +45,35 @@ public class StudentServiceImpl implements StudentService {
     this.teacherRepository = teacherRepository;
   }
 
+  //ToDO сделать эту логику в транзакции
+  @Override
+  public Future<ResponseStudentDTO> setRelationWithCourse(Long studentId, Long courseId, Pool client) {
+    Future<Student> studentFuture = studentRepository.getById(studentId, client);
+    Future<Course> courseFuture = courseRepository.getById(courseId, client);
+    return Future.all(studentFuture, courseFuture)
+      .flatMap(composit -> studentCourseRepository.getByStudentIdAndCourseId(studentId, courseId, client)
+        .compose(studentCourse -> getResponseStudentDTOFuture(studentId, courseId, client, studentCourse)));
+  }
 
   @Override
   public Future<List<CourseDTO>> getStudentCourses(Long id, Pool client) {
     return studentRepository.getById(id, client)
-      .compose(student -> {
-        return studentCourseRepository.getByStudentId(id, client)
-          .compose(studentCourseList -> {
-            List<Long> courseIds = getEntityIdsAsList(studentCourseList, StudentCourse::getCourseId);
-            if (courseIds.isEmpty()) {
-              return Future.succeededFuture(Collections.emptyList());
-            }
-            return courseRepository.getByIdIn(courseIds, client)
-              .compose(courses -> {
-                List<Long> teacherIds = getEntityIdsAsList(courses, Course::getTeacherId);
-                return teacherRepository.getByIdIn(teacherIds, client)
-                  .compose(teachers -> {
-                    List<CourseDTO> courseDTOS = getCourseDTOasList(courses, teachers);
-                    return Future.succeededFuture(courseDTOS);
-                  });
-              });
-          });
-      });
+      .compose(student -> studentCourseRepository.getByStudentId(id, client)
+        .compose(studentCourseList -> {
+          List<Long> courseIds = getEntityIdsAsList(studentCourseList, StudentCourse::getCourseId);
+          if (courseIds.isEmpty()) {
+            return Future.succeededFuture(Collections.emptyList());
+          }
+          return courseRepository.getByIdIn(courseIds, client)
+            .compose(courses -> {
+              List<Long> teacherIds = getEntityIdsAsList(courses, Course::getTeacherId);
+              return teacherRepository.getByIdIn(teacherIds, client)
+                .compose(teachers -> {
+                  List<CourseDTO> courseDTOS = getCourseDTOasList(courses, teachers);
+                  return Future.succeededFuture(courseDTOS);
+                });
+            });
+        }));
   }
 
   @Override
@@ -106,6 +115,7 @@ public class StudentServiceImpl implements StudentService {
         return loadStudentData(student, studentCourseList, client);
       });
   }
+
   @Override
   public Future<List<ResponseStudentDTO>> getAll(int page, int size, Pool client) {
     int offset = page * size;
@@ -118,6 +128,20 @@ public class StudentServiceImpl implements StudentService {
         return studentCourseRepository.getByStudentIdIn(studentsIds, client)
           .compose(studentCourseList -> loadStudentData(students, studentCourseList, client));
       });
+  }
+
+  private Future<ResponseStudentDTO> getResponseStudentDTOFuture(Long studentId, Long courseId, Pool client, StudentCourse studentCourse) {
+    if (studentCourse.getId() != null) {
+      return Future.failedFuture(new AlReadyExistException
+        (String.format("Relation between student with id: %d and course with id: %d already exists", studentId, courseId)));
+    }
+    StudentCourseTransientDTO studentCourseTransientDTO = new StudentCourseTransientDTO(
+      courseId,
+      studentId
+    );
+
+    return studentCourseRepository.save(studentCourseTransientDTO, client)
+      .compose(studentCourse1 -> getById(studentId, client));
   }
 
   private static List<CourseDTO> getCourseDTOasList(List<Course> courses, List<Teacher> teachers) {
@@ -204,7 +228,6 @@ public class StudentServiceImpl implements StudentService {
       .stream()
       .collect(Collectors.toMap(function, Function.identity()));
   }
-
 
   private static <T> List<Long> getEntityIdsAsList(List<T> entities, Function<T, Long> function) {
     return entities

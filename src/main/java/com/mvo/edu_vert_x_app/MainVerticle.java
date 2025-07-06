@@ -59,6 +59,7 @@ public class MainVerticle extends VerticleBase {
     router.put("/api/v1/students/:id").handler(context1 -> studentController.updateStudent(context1));
     router.delete("/api/v1/students/:id").handler(context1 -> studentController.deleteStudent(context1));
     router.get("/api/v1/students/:id/courses").handler(context1 -> studentController.getStudentCourses(context1));
+    router.post("/api/v1/students/:studentId/courses/:courseId").handler(context1 -> studentController.setRelationWithCourse(context1));
   }
 
   private Pool getPool() {
