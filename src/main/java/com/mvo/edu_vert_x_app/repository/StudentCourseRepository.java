@@ -8,6 +8,7 @@ import com.mvo.edu_vert_x_app.exception.ApiException;
 import com.mvo.edu_vert_x_app.mapper.StudentCourseMapper;
 import io.vertx.core.Future;
 import io.vertx.sqlclient.Pool;
+import io.vertx.sqlclient.SqlClient;
 import io.vertx.sqlclient.Tuple;
 
 import java.util.*;
@@ -34,6 +35,20 @@ public class StudentCourseRepository {
     );
   }
 
+  public Future<StudentCourse> save(StudentCourseTransientDTO studentCourseTransientDTO, SqlClient client) {
+    return client
+      .preparedQuery("""
+        INSERT INTO student_course (course_id, student_id)
+        VALUES ($1,$2)
+        RETURNING id, course_id, student_id
+        """)
+      .execute(Tuple.of(studentCourseTransientDTO.courseId(), studentCourseTransientDTO.studentId()))
+      .onFailure(throwable -> {
+        throw new ApiException(throwable.getMessage());
+      })
+      .map(studentCourseMapper::fromRowToStudentCourse);
+  }
+
   public Future<StudentCourse> getByStudentIdAndCourseId(Long studentId, Long courseId, Pool client) {
     return client.withConnection(conn -> conn
       .preparedQuery("""
@@ -45,6 +60,18 @@ public class StudentCourseRepository {
       .execute(Tuple.of(studentId, courseId))
       .map(studentCourseMapper::fromRowToStudentCourse)
     );
+  }
+
+  public Future<StudentCourse> getByStudentIdAndCourseId(Long studentId, Long courseId, SqlClient client) {
+    return client
+      .preparedQuery("""
+        SELECT *
+        FROM student_course
+        WHERE student_id = $1
+        AND course_id = $2
+        """)
+      .execute(Tuple.of(studentId, courseId))
+      .map(studentCourseMapper::fromRowToStudentCourse);
   }
 
   public Future<List<StudentCourse>> getByStudentId(Long studentId, Pool client) {

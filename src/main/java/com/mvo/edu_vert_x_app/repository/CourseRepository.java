@@ -6,6 +6,7 @@ import com.mvo.edu_vert_x_app.exception.NotFoundEntityException;
 import com.mvo.edu_vert_x_app.mapper.CourseMapper;
 import io.vertx.core.Future;
 import io.vertx.sqlclient.Pool;
+import io.vertx.sqlclient.SqlClient;
 import io.vertx.sqlclient.Tuple;
 
 import java.util.*;
@@ -48,4 +49,21 @@ public class CourseRepository {
       })
     );
   }
+
+  public Future<Course> getById(Long id, SqlClient client) {
+    return client
+      .preparedQuery("""
+        SELECT *
+        FROM course
+        WHERE id = $1
+        """)
+      .execute(Tuple.of(id))
+      .map(rows -> {
+        if (rows.size() == 0) {
+          throw new NotFoundEntityException(String.format("Course with id: %d not found", id));
+        }
+        return courseMapper.fromRowToCourse(rows);
+      });
+  }
+
 }

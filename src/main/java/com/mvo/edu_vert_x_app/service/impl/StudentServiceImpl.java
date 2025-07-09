@@ -17,9 +17,11 @@ import com.mvo.edu_vert_x_app.repository.StudentCourseRepository;
 import com.mvo.edu_vert_x_app.repository.StudentRepository;
 import com.mvo.edu_vert_x_app.repository.TeacherRepository;
 import com.mvo.edu_vert_x_app.service.StudentService;
+import com.mvo.edu_vert_x_app.util.DbExecutor;
 import io.vertx.sqlclient.Pool;
 
 import io.vertx.core.Future;
+import io.vertx.sqlclient.SqlConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,18 +47,51 @@ public class StudentServiceImpl implements StudentService {
     this.teacherRepository = teacherRepository;
   }
 
-  //ToDO сделать эту логику в транзакции
-  @Override
+  //Старый метод, использовался до того как внедрил транзакцию (временно оставил его)
+  @Deprecated
   public Future<ResponseStudentDTO> setRelationWithCourse(Long studentId, Long courseId, Pool client) {
     Future<Student> studentFuture = studentRepository.getById(studentId, client);
     Future<Course> courseFuture = courseRepository.getById(courseId, client);
     return Future.all(studentFuture, courseFuture)
       .flatMap(composit -> studentCourseRepository.getByStudentIdAndCourseId(studentId, courseId, client)
-        .compose(studentCourse -> getResponseStudentDTOFuture(studentId, courseId, client, studentCourse)));
+        .compose(studentCourse -> saveStudentCourseRelation(studentId, courseId, client, studentCourse)));
+  }
+
+  @Override
+  public Future<ResponseStudentDTO> setRelationWithCourse(Long studentId, Long courseId, Pool client, DbExecutor dbExecutor) {
+    logger.info("Starting setRelationWithCourse with student id: {}, course id: {}", studentId, courseId);
+    return dbExecutor.execute(sqlConnection -> {
+        logger.info("Founding student with id: {}", studentId);
+        Future<Student> studentFuture = studentRepository.getById(studentId, sqlConnection);
+        logger.info("Founding course with id: {}", courseId);
+        Future<Course> courseFuture = courseRepository.getById(courseId, sqlConnection);
+        return Future.all(studentFuture, courseFuture)
+          .flatMap(composit -> studentCourseRepository.getByStudentIdAndCourseId(studentId, courseId, sqlConnection)
+            .compose(studentCourse -> saveStudentCourseRelation(studentId, courseId, sqlConnection, studentCourse)));
+      }).compose(sc -> getById(studentId, client))
+      .onSuccess(responseStudentDTO -> logger.info("Successfully created relation with student id: {} and with course with id: {}", studentId, courseId))
+      .onFailure(error -> logger.error("Failed to create relation relation with student id: {} and with course with id: {}", studentId, courseId, error));
+  }
+
+  private Future<StudentCourse> saveStudentCourseRelation(Long studentId, Long courseId, SqlConnection sqlConnection, StudentCourse studentCourse) {
+    logger.info("Starting saveStudentCourseRelation with student id: {}, course id: {}", studentId, courseId);
+    if (studentCourse.getId() != null) {
+      logger.warn("Student {} and course {} already exist relation. StudentCourse id: {}", studentId, courseId, studentCourse.getId());
+      return Future.failedFuture(new AlReadyExistException
+        (String.format("Relation between student with id: %d and course with id: %d already exists", studentId, courseId)));
+    }
+    logger.info("Creating studentCourse with student id: {}, course id: {}", studentCourse, courseId);
+    StudentCourseTransientDTO studentCourseTransientDTO = new StudentCourseTransientDTO(
+      courseId,
+      studentId
+    );
+    logger.info("Saving studentCourse with student id: {}, course id: {} in DB", studentCourse, courseId);
+    return studentCourseRepository.save(studentCourseTransientDTO, sqlConnection);
   }
 
   @Override
   public Future<List<CourseDTO>> getStudentCourses(Long id, Pool client) {
+    logger.info("Starting getStudentCourses with student id: {}", id);
     return studentRepository.getById(id, client)
       .compose(student -> studentCourseRepository.getByStudentId(id, client)
         .compose(studentCourseList -> {
@@ -72,26 +107,34 @@ public class StudentServiceImpl implements StudentService {
                   List<CourseDTO> courseDTOS = getCourseDTOasList(courses, teachers);
                   return Future.succeededFuture(courseDTOS);
                 });
-            });
+            })
+            .onSuccess(courseDTOS -> logger.info("Successfully got courses for student with id: {}", id))
+            .onFailure(error -> logger.error("Failed to get courses for student with id: {}", id, error));
         }));
   }
 
   @Override
   public Future<DeleteResponseDTO> delete(Long id, Pool client) {
+    logger.info("Starting delete student with id: {}", id);
     return studentRepository.getById(id, client)
       .compose(student -> studentRepository.delete(id,client)
-        .map(new DeleteResponseDTO("Student deleted successfully")));
+        .map(new DeleteResponseDTO("Student deleted successfully")))
+      .onSuccess(deleteResponseDTO -> logger.info("Successfully deleted student with id: {}", id))
+      .onFailure(error -> logger.error("Failed to delete student with id: {}", id, error));
   }
 
   @Override
   public Future<ResponseStudentDTO> update(long id, StudentTransientDTO studentTransientDTO, Pool client) {
+    logger.info("Starting update student with id: {}. New student data: {}", id, studentTransientDTO.toString());
     return studentRepository.getById(id, client)
       .compose(student -> {
         student.setName(studentTransientDTO.name());
         student.setEmail(studentTransientDTO.email());
         return studentRepository.update(student, client)
           .compose(v -> getById(id, client));
-      });
+      })
+      .onSuccess(responseStudentDTO -> logger.info("Successfully update student with id: {}", id))
+      .onFailure(error -> logger.error("Failed to update student with id: {}", id, error));
   }
 
   @Override
@@ -99,7 +142,7 @@ public class StudentServiceImpl implements StudentService {
     logger.info("Saving student with email: {}", studentTransientDTO.email());
     return studentRepository.save(studentTransientDTO, client)
       .map(studentMapper::fromStudentToResponseStudentDTO)
-      .onSuccess(studentDTO -> logger.info("Student successfully created with id: {}", studentDTO.id()))
+      .onSuccess(responseStudentDTO -> logger.info("Student successfully created with id: {}", responseStudentDTO.id()))
       .onFailure(error -> logger.error("Failed to saving student", error));
   }
 
@@ -116,6 +159,7 @@ public class StudentServiceImpl implements StudentService {
       });
   }
 
+
   @Override
   public Future<List<ResponseStudentDTO>> getAll(int page, int size, Pool client) {
     int offset = page * size;
@@ -130,7 +174,7 @@ public class StudentServiceImpl implements StudentService {
       });
   }
 
-  private Future<ResponseStudentDTO> getResponseStudentDTOFuture(Long studentId, Long courseId, Pool client, StudentCourse studentCourse) {
+  private Future<ResponseStudentDTO> saveStudentCourseRelation(Long studentId, Long courseId, Pool client, StudentCourse studentCourse) {
     if (studentCourse.getId() != null) {
       return Future.failedFuture(new AlReadyExistException
         (String.format("Relation between student with id: %d and course with id: %d already exists", studentId, courseId)));

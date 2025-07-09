@@ -5,6 +5,8 @@ import com.mvo.edu_vert_x_app.dto.request.StudentTransientDTO;
 import com.mvo.edu_vert_x_app.dto.response.ResponseStudentDTO;
 import com.mvo.edu_vert_x_app.exception.BadRequestException;
 import com.mvo.edu_vert_x_app.service.StudentService;
+import com.mvo.edu_vert_x_app.util.DbExecutor;
+import com.mvo.edu_vert_x_app.util.TxExecutor;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -27,7 +29,9 @@ public class StudentController {
     Long courseId = Long.valueOf(stringCourseId);
     Long studentId = Long.valueOf(stringStudentId);
 
-    studentService.setRelationWithCourse(studentId,courseId, client)
+    DbExecutor trExecutor = new TxExecutor(client);
+
+    studentService.setRelationWithCourse(studentId,courseId, client, trExecutor)
       .onSuccess(responseStudentDTO -> {
         JsonObject responseBody = new JsonObject();
         responseBody.put("id", responseStudentDTO.id());

@@ -4,6 +4,7 @@ import com.mvo.edu_vert_x_app.dto.CourseDTO;
 import com.mvo.edu_vert_x_app.dto.request.StudentTransientDTO;
 import com.mvo.edu_vert_x_app.dto.response.DeleteResponseDTO;
 import com.mvo.edu_vert_x_app.dto.response.ResponseStudentDTO;
+import com.mvo.edu_vert_x_app.util.DbExecutor;
 import io.vertx.sqlclient.Pool;
 import java.util.*;
 
@@ -22,6 +23,6 @@ public interface StudentService {
 
   Future<List<CourseDTO>> getStudentCourses(Long id, Pool client);
 
-  Future<ResponseStudentDTO> setRelationWithCourse(Long studentId, Long courseId, Pool client);
+  Future<ResponseStudentDTO> setRelationWithCourse(Long studentId, Long courseId, Pool client, DbExecutor dbExecutor);
 
 }

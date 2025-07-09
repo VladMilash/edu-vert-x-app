@@ -6,6 +6,7 @@ import com.mvo.edu_vert_x_app.entity.Student;
 import com.mvo.edu_vert_x_app.exception.NotFoundEntityException;
 import com.mvo.edu_vert_x_app.mapper.StudentMapper;
 import io.vertx.sqlclient.Pool;
+import io.vertx.sqlclient.SqlClient;
 import io.vertx.sqlclient.Tuple;
 import io.vertx.core.Future;
 
@@ -53,21 +54,34 @@ public class StudentRepository {
   }
 
   public Future<Student> getById(Long id, Pool client) {
-    return client.getConnection().compose(conn -> {
-      return conn
-        .preparedQuery("""
-        SELECT * FROM student
-        WHERE id = $1
-        """)
-        .execute(Tuple.of(id))
-        .map(rows -> {
-          if (rows.size() == 0) {
-            throw new NotFoundEntityException(String.format("Student with id: %d not found", id));
-          }
-          return studentMapper.fromRowToStudent(rows);
-        })
-        .onComplete(ar -> conn.close());
-    });
+    return client.getConnection().compose(conn -> conn
+      .preparedQuery("""
+      SELECT * FROM student
+      WHERE id = $1
+      """)
+      .execute(Tuple.of(id))
+      .map(rows -> {
+        if (rows.size() == 0) {
+          throw new NotFoundEntityException(String.format("Student with id: %d not found", id));
+        }
+        return studentMapper.fromRowToStudent(rows);
+      })
+      .onComplete(ar -> conn.close()));
+  }
+
+  public Future<Student> getById(Long id, SqlClient client) {
+    return client
+      .preparedQuery("""
+      SELECT * FROM student
+      WHERE id = $1
+      """)
+      .execute(Tuple.of(id))
+      .map(rows -> {
+        if (rows.size() == 0) {
+          throw new NotFoundEntityException(String.format("Student with id: %d not found", id));
+        }
+        return studentMapper.fromRowToStudent(rows);
+      });
   }
 
   public Future<List<Student>> getAll(int limit, int offset, Pool client) {
