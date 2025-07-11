@@ -1,6 +1,7 @@
 package com.mvo.edu_vert_x_app.repository;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.mvo.edu_vert_x_app.dto.request.CourseTransientDTO;
 import com.mvo.edu_vert_x_app.entity.Course;
 import com.mvo.edu_vert_x_app.exception.NotFoundEntityException;
 import com.mvo.edu_vert_x_app.mapper.CourseMapper;
@@ -16,6 +17,18 @@ public class CourseRepository {
 
   public CourseRepository(CourseMapper courseMapper) {
     this.courseMapper = courseMapper;
+  }
+
+  public Future<Course> save(CourseTransientDTO courseTransientDTO, Pool client) {
+    return client.withConnection(conn -> conn
+      .preparedQuery("""
+        INSERT INTO course (title)
+        VALUES ($1)
+        RETURNING id, title, teacher_id
+        """)
+      .execute(Tuple.of(courseTransientDTO.title()))
+      .map(courseMapper::fromRowToCourse)
+    );
   }
 
   public Future<List<Course>> getByIdIn(List<Long> courseIds, Pool client) {

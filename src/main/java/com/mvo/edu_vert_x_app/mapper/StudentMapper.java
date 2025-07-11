@@ -31,7 +31,7 @@ public class StudentMapper {
     );
   }
 
-  public List<Student> fromRowsToStudent(RowSet<Row> rows) {
+  public List<Student> fromRowsToStudentList(RowSet<Row> rows) {
     List<Student> studentList = new ArrayList<>();
     for (Row row : rows) {
       Long id = row.getLong("id");

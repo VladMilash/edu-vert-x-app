@@ -93,8 +93,25 @@ public class StudentRepository {
           OFFSET $2
           """)
         .execute(Tuple.of(limit, offset))
-        .map(studentMapper::fromRowsToStudent)
+        .map(studentMapper::fromRowsToStudentList)
     );
+  }
+
+  //TODO sout заменить на логирование, в других репозитория тоже
+  public Future<List<Student>> getByIdIn(List<Long> studentIds, Pool client) {
+    if(studentIds.isEmpty()) {
+      return Future.succeededFuture(Collections.emptyList());
+    }
+    String sql = "SElECT * FROM student WHERE id = ANY($1::bigint[])";
+    Tuple params = Tuple.of(studentIds.toArray(new Long[0]));
+    System.out.println("Executing SQL: " + sql);
+    System.out.println("With params: " + Arrays.toString(studentIds.toArray()));
+    return client
+      .withConnection(conn -> conn
+        .preparedQuery(sql)
+        .execute(params)
+        .map(studentMapper::fromRowsToStudentList)
+      );
   }
 
 }

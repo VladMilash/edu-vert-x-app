@@ -1,5 +1,6 @@
 package com.mvo.edu_vert_x_app.mapper;
 
+import com.mvo.edu_vert_x_app.entity.Student;
 import com.mvo.edu_vert_x_app.entity.Teacher;
 import io.vertx.sqlclient.Row;
 import io.vertx.sqlclient.RowSet;
@@ -17,5 +18,13 @@ public class TeacherMapper {
       teacherList.add(teacher);
     }
     return teacherList;
+  }
+
+  public Teacher fromRowToTeacher(RowSet<Row> rows) {
+    Row row = rows.iterator().next();
+    Teacher teacher = new Teacher();
+    teacher.setId(row.getLong("id"));
+    teacher.setName(row.getString("name"));
+    return teacher;
   }
 }

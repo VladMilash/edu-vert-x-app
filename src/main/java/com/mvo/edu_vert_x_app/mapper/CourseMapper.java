@@ -1,5 +1,6 @@
 package com.mvo.edu_vert_x_app.mapper;
 
+import com.mvo.edu_vert_x_app.dto.response.ResponseCoursesDTO;
 import com.mvo.edu_vert_x_app.entity.Course;
 import com.mvo.edu_vert_x_app.entity.Student;
 import com.mvo.edu_vert_x_app.entity.StudentCourse;
@@ -33,6 +34,15 @@ public class CourseMapper {
     course.setTitle(title);
     course.setTeacherId(teacherId);
     return course;
+  }
+
+  public ResponseCoursesDTO fromCourseToResponseCourseDTO(Course course) {
+    return new ResponseCoursesDTO(
+      course.getId(),
+      course.getTitle(),
+      null,
+      new HashSet<>()
+    );
   }
 
 }

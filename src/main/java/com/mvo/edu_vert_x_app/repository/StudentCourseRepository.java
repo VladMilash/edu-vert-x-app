@@ -87,6 +87,19 @@ public class StudentCourseRepository {
       );
   }
 
+  public Future<List<StudentCourse>> getByCourseId(Long courseId, Pool client) {
+    return client
+      .withConnection(conn -> conn
+        .preparedQuery("""
+          SELECT *
+          FROM student_course
+          WHERE course_id = $1
+          """)
+        .execute(Tuple.of(courseId))
+        .map(studentCourseMapper::fromRowsToStudentCoursesList)
+      );
+  }
+
   public Future<List<StudentCourse>> getByStudentIdIn(List<Long> studentsIds, Pool client) {
     if (studentsIds.isEmpty()) {
       return Future.succeededFuture(Collections.emptyList());

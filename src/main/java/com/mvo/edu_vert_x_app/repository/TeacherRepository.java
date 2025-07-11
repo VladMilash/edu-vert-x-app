@@ -24,4 +24,15 @@ public class TeacherRepository {
           .map(teacherMapper::fromRowsToTechersList)
       );
   }
+
+  public Future<Teacher> getById(Long teacherId, Pool client) {
+    return client.withConnection(conn -> conn
+      .preparedQuery("""
+        SELECT * FROM teacher
+        WHERE id = $1
+        """)
+      .execute(Tuple.of(teacherId))
+      .map(teacherMapper::fromRowToTeacher)
+    );
+  }
 }

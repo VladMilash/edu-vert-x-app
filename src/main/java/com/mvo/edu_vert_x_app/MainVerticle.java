@@ -2,6 +2,7 @@ package com.mvo.edu_vert_x_app;
 
 import com.mvo.edu_vert_x_app.config.DbConfig;
 import com.mvo.edu_vert_x_app.config.FlywayConfig;
+import com.mvo.edu_vert_x_app.controller.CourseController;
 import com.mvo.edu_vert_x_app.controller.StudentController;
 import com.mvo.edu_vert_x_app.exception.GlobalErrorHandler;
 import com.mvo.edu_vert_x_app.mapper.CourseMapper;
@@ -12,7 +13,9 @@ import com.mvo.edu_vert_x_app.repository.CourseRepository;
 import com.mvo.edu_vert_x_app.repository.StudentCourseRepository;
 import com.mvo.edu_vert_x_app.repository.StudentRepository;
 import com.mvo.edu_vert_x_app.repository.TeacherRepository;
+import com.mvo.edu_vert_x_app.service.CourseService;
 import com.mvo.edu_vert_x_app.service.StudentService;
+import com.mvo.edu_vert_x_app.service.impl.CourseServiceImpl;
 import com.mvo.edu_vert_x_app.service.impl.StudentServiceImpl;
 import io.vertx.core.Future;
 import io.vertx.core.VerticleBase;
@@ -24,6 +27,7 @@ import io.vertx.sqlclient.Pool;
 
 public class MainVerticle extends VerticleBase {
   private StudentController studentController;
+  private CourseController courseController;
   private DbConfig dbConfig;
   private FlywayConfig flywayConfig;
 
@@ -47,6 +51,9 @@ public class MainVerticle extends VerticleBase {
       studentCourseRepository, courseRepository, teacherRepository);
     studentController = new StudentController(client, studentService);
 
+    CourseService courseService = new CourseServiceImpl(courseRepository, courseMapper, studentCourseRepository, studentRepository, teacherRepository);
+    courseController = new CourseController(client, courseService);
+
     Router router = getRouter();
     configureRoutes(router);
     return getHttpServerFuture(router);
@@ -60,6 +67,8 @@ public class MainVerticle extends VerticleBase {
     router.delete("/api/v1/students/:id").handler(context1 -> studentController.deleteStudent(context1));
     router.get("/api/v1/students/:id/courses").handler(context1 -> studentController.getStudentCourses(context1));
     router.post("/api/v1/students/:studentId/courses/:courseId").handler(context1 -> studentController.setRelationWithCourse(context1));
+
+    router.post("/api/v1/courses/").handler(context1 -> courseController.saveCourse(context1));
   }
 
   private Pool getPool() {
